@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lung X-Ray Classification: Normal vs TBC</title>
+    <!-- Tailwind CSS for modern and clean styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+    </style>
+</head>
+<body class="bg-gray-50 min-h-screen flex items-center justify-center p-6">
+
+    <div class="bg-white rounded-2xl shadow-xl max-w-lg w-full p-8 border border-gray-100">
+        
+        <div class="text-center mb-8">
+            <h1 class="text-3xl font-extrabold text-blue-900 mb-2">Lung X-Ray Analyzer</h1>
+            <p class="text-gray-500 text-sm">Upload a chest X-ray image to detect 'Normal' or 'TBC' condition.</p>
+        </div>
+
+        <!-- Upload Form -->
+        <div class="mb-6">
+            <label class="block text-sm font-medium text-gray-700 mb-2">Select X-Ray Image (PNG/JPG)</label>
+            <div class="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 border-dashed rounded-xl transition hover:border-blue-500">
+                <div class="space-y-1 text-center">
+                    <svg class="mx-auto h-12 w-12 text-gray-400 mb-3" stroke="currentColor" fill="none" viewBox="0 0 48 48" aria-hidden="true">
+                        <path d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+                    </svg>
+                    <div class="flex text-sm text-gray-600 justify-center">
+                        <label for="imageInput" class="relative cursor-pointer bg-white rounded-md font-medium text-blue-600 hover:text-blue-500 focus-within:outline-none focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-blue-500">
+                            <span>Upload a file</span>
+                            <input id="imageInput" name="image" type="file" class="sr-only" accept="image/png, image/jpeg, image/jpg" onchange="previewImage(event)">
+                        </label>
+                        <p class="pl-1">or drag and drop</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Image Preview -->
+        <div id="previewContainer" class="hidden mb-6">
+            <p class="text-sm font-medium text-gray-700 mb-2">Image Preview</p>
+            <img id="imagePreview" src="#" alt="Preview" class="rounded-xl object-contain max-h-64 w-full border border-gray-200 bg-gray-100 p-1">
+        </div>
+
+        <!-- Analyze Button -->
+        <button onclick="analyzeImage()" id="analyzeBtn" class="w-full bg-blue-600 text-white font-semibold py-3 px-4 rounded-xl shadow-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+            Analyze Image
+        </button>
+
+        <!-- Result Display -->
+        <div id="resultContainer" class="hidden mt-8">
+            <div class="p-6 rounded-xl border border-gray-100 shadow-sm text-center">
+                <p class="text-sm text-gray-500 uppercase tracking-wide font-semibold mb-1">Analysis Result</p>
+                <div id="resultLabel" class="text-3xl font-bold text-gray-900 mb-2"></div>
+                <div class="flex justify-center items-center gap-2">
+                    <span class="text-sm text-gray-500">Confidence Score:</span>
+                    <span id="resultConfidence" class="inline-flex items-center px-3 py-0.5 rounded-full text-sm font-medium bg-blue-100 text-blue-800"></span>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Error Display -->
+        <div id="errorContainer" class="hidden mt-6 p-4 rounded-xl bg-red-50 border border-red-200">
+            <p id="errorText" class="text-sm text-red-600 font-medium text-center"></p>
+        </div>
+
+    </div>
+
+    <script>
+        function previewImage(event) {
+            const input = event.target;
+            const previewContainer = document.getElementById('previewContainer');
+            const imagePreview = document.getElementById('imagePreview');
+            const resultContainer = document.getElementById('resultContainer');
+            const errorContainer = document.getElementById('errorContainer');
+            
+            // Hide previous results
+            resultContainer.classList.add('hidden');
+            errorContainer.classList.add('hidden');
+
+            if (input.files && input.files[0]) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    imagePreview.src = e.target.result;
+                    previewContainer.classList.remove('hidden');
+                }
+                reader.readAsDataURL(input.files[0]);
+            } else {
+                previewContainer.classList.add('hidden');
+            }
+        }
+
+        async function analyzeImage() {
+            const fileInput = document.getElementById('imageInput');
+            const resultContainer = document.getElementById('resultContainer');
+            const resultLabel = document.getElementById('resultLabel');
+            const resultConfidence = document.getElementById('resultConfidence');
+            const errorContainer = document.getElementById('errorContainer');
+            const errorText = document.getElementById('errorText');
+            const analyzeBtn = document.getElementById('analyzeBtn');
+
+            if (!fileInput.files || fileInput.files.length === 0) {
+                showError("Please select an image first.");
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('image', fileInput.files[0]);
+
+            // UI Loading state
+            analyzeBtn.disabled = true;
+            analyzeBtn.innerHTML = `
+                <svg class="animate-spin -ml-1 mr-3 h-5 w-5 text-white inline-block" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                Processing...
+            `;
+            resultContainer.classList.add('hidden');
+            errorContainer.classList.add('hidden');
+
+            try {
+                const response = await fetch('/predict', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const textResponse = await response.text();
+                let data;
+                try {
+                    data = JSON.parse(textResponse);
+                } catch (e) {
+                    console.error("Raw response:", textResponse);
+                    if (textResponse.trim() === "") {
+                        throw new Error(`Server returned an empty response. Was the file too large? (Status ${response.status})`);
+                    } else {
+                        throw new Error(`Server error: ${textResponse.substring(0, 100)}...`);
+                    }
+                }
+
+                if (!response.ok) {
+                    throw new Error(data.error || "Something went wrong processing the image.");
+                }
+
+                // Show Results
+                resultLabel.textContent = data.label;
+                
+                // Color coding based on result
+                if (data.label === "Normal") {
+                    resultLabel.className = "text-3xl font-bold text-green-600 mb-2";
+                } else {
+                    resultLabel.className = "text-3xl font-bold text-red-600 mb-2";
+                }
+
+                resultConfidence.textContent = data.confidence;
+                resultContainer.classList.remove('hidden');
+
+            } catch (error) {
+                showError(error.message);
+            } finally {
+                // Restore button
+                analyzeBtn.disabled = false;
+                analyzeBtn.textContent = "Analyze Image";
+            }
+        }
+
+        function showError(message) {
+            document.getElementById('errorText').textContent = message;
+            document.getElementById('errorContainer').classList.remove('hidden');
+            document.getElementById('resultContainer').classList.add('hidden');
+        }
+    </script>
+</body>
+</html>
